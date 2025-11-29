@@ -43,7 +43,6 @@ header{
     to{opacity:1; transform:translateY(0);}
 }
 
-/* Inputs & Buttons */
 input, button, select{
     width:100%;
     padding:12px;
@@ -70,7 +69,6 @@ button{
 }
 
 button:hover{background:#1d4fb7;}
-
 .link-btn{ background:#505b7a; }
 .link-btn:hover{ background:#3c4663; }
 
@@ -90,7 +88,6 @@ th{
     color:white;
     padding:10px;
     text-align:left;
-    font-weight:600;
 }
 
 td{
@@ -102,7 +99,6 @@ tr:hover td{
     background:#f1f4ff;
 }
 
-/* Delete button */
 td button{
     padding:8px 12px;
     border-radius:6px;
@@ -129,6 +125,7 @@ td button:hover{ background:#b32222; }
   <p style="color:#555;font-size:14px;">
     <b>Informasi:</b> Absensi hanya bisa dilakukan <b>hari Selasa & Sabtu</b>, pukul <b>12:00 WIB sampai 19:00 WIB</b>.
   </p>
+
   <label>Nomor ID</label>
   <input type="text" id="userId" placeholder="Masukkan ID Anda...">
 
@@ -162,7 +159,7 @@ td button:hover{ background:#b32222; }
 <!-- Halaman Admin Panel -->
 <div class="container" id="adminPanel" style="display:none;">
 <h3>Rekap Absensi</h3>
-<table width="100%" id="rekapTable">
+<table id="rekapTable">
 <thead>
 <tr><th>ID</th><th>Nama</th><th>Waktu</th><th>Status</th><th>Alasan</th><th>Aksi</th></tr>
 </thead>
@@ -171,8 +168,11 @@ td button:hover{ background:#b32222; }
 <button class="back-btn" onclick="logoutAdmin()">Keluar Admin</button>
 </div>
 
+<!-- 🔊 SUARA NOTIFIKASI -->
+<audio id="soundSuccess" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+
 <script>
-// ======= CONFIG FIREBASE =======
+// Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyCCheqFeLe-BS5ZZiyXLfmRVnyoDbmbMiM",
   authDomain: "absen-74c40.firebaseapp.com",
@@ -185,7 +185,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ======= DATA TERDAFTAR =======
+// Data user
 const registeredUsers = {
     "200409":"Zendi Prianto",
     "110810":"Ramadhan",
@@ -215,28 +215,18 @@ const registeredUsers = {
     "061108":"Naufal Rehan"
 };
 
-// ======= Toggle input alasan =======
 function toggleAlasanInput(){
-    const status = document.getElementById("statusAbsen").value;
-    document.getElementById("alasanWrapper").style.display = (status==="Izin") ? "block" : "none";
+    document.getElementById("alasanWrapper").style.display =
+        (document.getElementById("statusAbsen").value === "Izin") ? "block" : "none";
 }
 
-// ======= ABSENSI (1 ID 1x PER HARI + BATAS 19:00 WIB) =======
 function submitAbsensi(){
     const id = document.getElementById("userId").value.trim();
     const pesan = document.getElementById("pesan");
     const status = document.getElementById("statusAbsen").value;
 
-    if(!id){
-        pesan.style.color="red"; 
-        pesan.innerText="ID tidak boleh kosong!"; 
-        return;
-    }
-    if(!registeredUsers[id]){
-        pesan.style.color="red"; 
-        pesan.innerText="ID tidak terdaftar!"; 
-        return;
-    }
+    if(!id){ pesan.innerText="ID tidak boleh kosong!"; return; }
+    if(!registeredUsers[id]){ pesan.innerText="ID tidak terdaftar!"; return; }
 
     const now = new Date();
     const hari = now.getDay();
@@ -244,124 +234,115 @@ function submitAbsensi(){
     const menit = now.getMinutes();
 
     if(!(hari===2 || hari===6)){
-        pesan.style.color="red"; 
-        pesan.innerText="Absensi hanya bisa dilakukan hari Selasa & Sabtu!"; 
+        pesan.innerText="Absensi hanya hari Selasa & Sabtu!";
         return;
     }
-
     if(jam < 12 || (jam === 19 && menit > 0) || jam > 19){
-        pesan.style.color="red"; 
-        pesan.innerText="Absensi hanya dapat dilakukan pukul 12:00 - 19:00 WIB!";
+        pesan.innerText="Jam absen 12:00 - 19:00 WIB!";
         return;
     }
 
-    // ===== CEK SUDAH ABSEN HARI INI =====
-    db.ref("absensi").once("value", snapshot => {
-        let sudah = false;
+    db.ref("absensi").once("value", snapshot=>{
+        let sudah=false;
 
-        snapshot.forEach(snap => {
-            const item = snap.val();
-            const t = new Date(item.waktu);
+        snapshot.forEach(snap=>{
+            const item=snap.val();
+            const t=new Date(item.waktu);
 
-            const sameDate =
-                t.getDate() === now.getDate() &&
-                t.getMonth() === now.getMonth() &&
-                t.getFullYear() === now.getFullYear();
-
-            if (item.id === id && sameDate) {
-                sudah = true;
+            if(item.id===id &&
+                t.getDate()==now.getDate() &&
+                t.getMonth()==now.getMonth() &&
+                t.getFullYear()==now.getFullYear()
+            ){
+                sudah=true;
             }
         });
 
-        if (sudah) {
-            pesan.style.color = "red";
-            pesan.innerText = "Anda sudah absen hari ini!";
+        if(sudah){
+            pesan.innerText="Anda sudah absen hari ini!";
             return;
         }
 
-        // Lanjut simpan data
-        if(status === "Izin"){
-            const alasan = document.getElementById("alasanIzin").value.trim();
-            if(!alasan){
-                pesan.style.color="red";
-                pesan.innerText="Alasan izin wajib diisi!";
-                return;
-            }
-            simpanData(id, registeredUsers[id], now.toLocaleString(), status, alasan);
-        } else {
-            simpanData(id, registeredUsers[id], now.toLocaleString(), status, "-");
+        const alasan = (status==="Izin")
+            ? document.getElementById("alasanIzin").value.trim()
+            : "-";
+
+        if(status==="Izin" && !alasan){
+            pesan.innerText="Alasan izin wajib diisi!";
+            return;
         }
+
+        simpanData(id, registeredUsers[id], now.toLocaleString(), status, alasan);
     });
 }
 
-// ======= SIMPAN DATA =======
-function simpanData(id, nama, waktu, status, alasan){
-    const pesan = document.getElementById("pesan");
+function simpanData(id,nama,waktu,status,alasan){
+    const pesan=document.getElementById("pesan");
 
     db.ref("absensi").push({
-        id:id,
-        nama:nama,
-        waktu:waktu,
-        status:status,
-        alasan:alasan || "-"
-    }, err => {
+        id, nama, waktu, status, alasan
+    }, err=>{
         if(err){
-            pesan.style.color="red";
             pesan.innerText="Gagal absen!";
         } else {
             pesan.style.color="green";
             pesan.innerText="Absensi berhasil!";
+
+            // 🔊 MAIN SUARA NOTIFIKASI
+            document.getElementById("soundSuccess").play();
+
             document.getElementById("userId").value="";
             document.getElementById("alasanIzin").value="";
         }
     });
 }
 
-// ======= ADMIN LOGIN =======
 function openAdmin(){
-    document.getElementById("absenPage").style.display="none"; 
+    document.getElementById("absenPage").style.display="none";
     document.getElementById("adminLogin").style.display="block";
 }
 function backToHome(){
-    document.getElementById("adminLogin").style.display="none"; 
+    document.getElementById("adminLogin").style.display="none";
     document.getElementById("absenPage").style.display="block";
 }
 function loginAdmin(){
-    const pass = document.getElementById("adminPass").value;
-    if(pass==="fourl"){
+    if(document.getElementById("adminPass").value==="fourl"){
         document.getElementById("adminLogin").style.display="none";
-        document.getElementById("adminPanel").style.display="block"; 
+        document.getElementById("adminPanel").style.display="block";
         loadRekap();
+    } else {
+        document.getElementById("adminLoginMsg").innerText="Password salah!";
     }
-    else document.getElementById("adminLoginMsg").innerText="Password salah!";
 }
 function logoutAdmin(){
-    document.getElementById("adminPanel").style.display="none"; 
+    document.getElementById("adminPanel").style.display="none";
     document.getElementById("absenPage").style.display="block";
 }
 
-// ======= REKAP =======
 function loadRekap(){
-    const body = document.getElementById("rekapBody");
+    const body=document.getElementById("rekapBody");
     body.innerHTML="";
-    db.ref('absensi').once('value', snapshot=>{
+
+    db.ref("absensi").once("value", snapshot=>{
         snapshot.forEach(snap=>{
-            const item = snap.val();
-            const key = snap.key;
-            body.innerHTML += `
+            const item=snap.val();
+            const key=snap.key;
+
+            body.innerHTML+=`
             <tr>
                 <td>${item.id}</td>
                 <td>${item.nama}</td>
                 <td>${item.waktu}</td>
                 <td>${item.status}</td>
-                <td>${item.alasan || "-"}</td>
+                <td>${item.alasan}</td>
                 <td><button onclick="hapusData('${key}')">Hapus</button></td>
             </tr>`;
         });
     });
 }
+
 function hapusData(key){
-    db.ref('absensi/'+key).remove().then(()=>loadRekap());
+    db.ref("absensi/"+key).remove().then(()=>loadRekap());
 }
 </script>
 
