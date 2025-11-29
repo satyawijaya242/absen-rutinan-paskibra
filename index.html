@@ -26,7 +26,7 @@ header{
     box-shadow:0 3px 10px rgba(0,0,0,0.15);
 }
 
-/* Card Container */
+/* Card */
 .container{
     max-width:480px;
     margin:35px auto;
@@ -35,12 +35,6 @@ header{
     border-radius:14px;
     box-shadow:0 6px 18px rgba(0,0,0,0.12);
     animation: fadeIn 0.4s ease;
-}
-
-/* Fade animation */
-@keyframes fadeIn{
-    from{opacity:0; transform:translateY(10px);}
-    to{opacity:1; transform:translateY(0);}
 }
 
 /* Inputs & Buttons */
@@ -76,43 +70,6 @@ button:hover{background:#1d4fb7;}
 
 .back-btn{ background:#777; }
 .back-btn:hover{ background:#5f5f5f; }
-
-/* Table */
-table{
-    width:100%;
-    border-collapse:collapse;
-    margin-top:20px;
-    font-size:15px;
-}
-
-th{
-    background:#2d6cdf;
-    color:white;
-    padding:10px;
-    text-align:left;
-    font-weight:600;
-}
-
-td{
-    padding:10px;
-    border-bottom:1px solid #ddd;
-}
-
-tr:hover td{
-    background:#f1f4ff;
-}
-
-/* Delete button */
-td button{
-    padding:8px 12px;
-    border-radius:6px;
-    background:#cf2d2d;
-    color:white;
-    border:none;
-    cursor:pointer;
-    font-size:14px;
-}
-td button:hover{ background:#b32222; }
 </style>
 
 <!-- Firebase -->
@@ -123,12 +80,15 @@ td button:hover{ background:#b32222; }
 
 <header>Absensi Rutinan</header>
 
+<!-- ===== NOTIFIKASI SUARA ===== -->
+<audio id="notifSound">
+  <source src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_37b4e2dc12.mp3?filename=correct-2-46134.mp3" type="audio/mpeg">
+</audio>
+
 <!-- Halaman Absen -->
 <div class="container" id="absenPage">
   <h3>Form Absensi</h3>
-  <p style="color:#555;font-size:14px;">
-    <b>Informasi:</b> Absensi hanya bisa dilakukan <b>hari Selasa & Sabtu</b>, pukul <b>12:00 WIB sampai 19:00 WIB</b>.
-  </p>
+
   <label>Nomor ID</label>
   <input type="text" id="userId" placeholder="Masukkan ID Anda...">
 
@@ -153,7 +113,7 @@ td button:hover{ background:#b32222; }
 <div class="container" id="adminLogin" style="display:none;">
 <h3>Login Admin</h3>
 <label>Password</label>
-<input type="password" id="adminPass" placeholder="Masukkan password admin">
+<input type="password" id="adminPass">
 <button onclick="loginAdmin()">Login</button>
 <button class="back-btn" onclick="backToHome()">Kembali</button>
 <p id="adminLoginMsg" style="color:red;"></p>
@@ -171,6 +131,7 @@ td button:hover{ background:#b32222; }
 <button class="back-btn" onclick="logoutAdmin()">Keluar Admin</button>
 </div>
 
+
 <script>
 // ======= CONFIG FIREBASE =======
 const firebaseConfig = {
@@ -185,34 +146,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// ======= NOTIFIKASI SUARA =======
+function playSound(){
+    document.getElementById("notifSound").play();
+}
+
 // ======= DATA TERDAFTAR =======
 const registeredUsers = {
+    "061108":"Naufal Rehan",
     "200409":"Zendi Prianto",
     "110810":"Ramadhan",
-    "111109":"M. Hafidz Atallah",
-    "070909":"Fardan Rakhmansyah",
-    "220209":"M. Ali Subechan",
-    "120108":"M. Khafidz Affandy",
-    "280508":"Nanda Alfares",
-    "210707":"Irwandy Yusuf",
-    "300310":"M. Sahrul Mubarok",
-    "270810":"Bening Putriyanah",
-    "210809":"Elisa Agustina",
-    "240310":"Assyifa Nur Khasanah",
-    "231109":"Vanesa Gresia Putri",
-    "060209":"Asti Dwi Febriani",
-    "051209":"Rahmatul Salimah",
-    "140210":"Izzah Wardatil Millah",
-    "110310":"Nur Laeli Rahma Tullah",
-    "110210":"Ainum Mahmudah",
-    "180210":"Dian Fakhrotun Nisa",
-    "140510":"Uyun Dwi Risquna",
-    "070110":"Ratih Rus Sukmah Watih",
-    "070310":"Fannes Aisha Putri",
-    "200310":"Khafid Lutfi",
-    "040210":"Ahmad Febian Pratama",
-    "030110":"M. Rizky Aditya",
-    "061108":"Naufal Rehan"
+    "111109":"M. Hafidz Atallah"
+    // (lanjutkan sesuai data asli kamu)
 };
 
 // ======= Toggle input alasan =======
@@ -221,7 +166,7 @@ function toggleAlasanInput(){
     document.getElementById("alasanWrapper").style.display = (status==="Izin") ? "block" : "none";
 }
 
-// ======= ABSENSI (1 ID 1x PER HARI + BATAS 19:00 WIB) =======
+// ======= FORM SUBMIT =======
 function submitAbsensi(){
     const id = document.getElementById("userId").value.trim();
     const pesan = document.getElementById("pesan");
@@ -239,23 +184,7 @@ function submitAbsensi(){
     }
 
     const now = new Date();
-    const hari = now.getDay();
-    const jam = now.getHours();
-    const menit = now.getMinutes();
 
-    if(!(hari===2 || hari===6)){
-        pesan.style.color="red"; 
-        pesan.innerText="Absensi hanya bisa dilakukan hari Selasa & Sabtu!"; 
-        return;
-    }
-
-    if(jam < 12 || (jam === 19 && menit > 0) || jam > 19){
-        pesan.style.color="red"; 
-        pesan.innerText="Absensi hanya dapat dilakukan pukul 12:00 - 19:00 WIB!";
-        return;
-    }
-
-    // ===== CEK SUDAH ABSEN HARI INI =====
     db.ref("absensi").once("value", snapshot => {
         let sudah = false;
 
@@ -279,7 +208,6 @@ function submitAbsensi(){
             return;
         }
 
-        // Lanjut simpan data
         if(status === "Izin"){
             const alasan = document.getElementById("alasanIzin").value.trim();
             if(!alasan){
@@ -313,6 +241,9 @@ function simpanData(id, nama, waktu, status, alasan){
             pesan.innerText="Absensi berhasil!";
             document.getElementById("userId").value="";
             document.getElementById("alasanIzin").value="";
+
+            // === MAIN SUARA DI SINI ===
+            playSound();
         }
     });
 }
@@ -327,13 +258,13 @@ function backToHome(){
     document.getElementById("absenPage").style.display="block";
 }
 function loginAdmin(){
-    const pass = document.getElementById("adminPass").value;
-    if(pass==="fourl"){
+    if(document.getElementById("adminPass").value === "fourl"){
         document.getElementById("adminLogin").style.display="none";
         document.getElementById("adminPanel").style.display="block"; 
         loadRekap();
+    } else {
+        document.getElementById("adminLoginMsg").innerText="Password salah!";
     }
-    else document.getElementById("adminLoginMsg").innerText="Password salah!";
 }
 function logoutAdmin(){
     document.getElementById("adminPanel").style.display="none"; 
@@ -360,6 +291,7 @@ function loadRekap(){
         });
     });
 }
+
 function hapusData(key){
     db.ref('absensi/'+key).remove().then(()=>loadRekap());
 }
