@@ -169,8 +169,7 @@ td button:hover{ background:#b32222; }
 </div>
 
 <!-- 🔊 SUARA NOTIFIKASI -->
-<audio id="soundSuccess" src="https://raw.githubusercontent.com/satyawijaya242/sound/main/ssstik.io_1764400884057.mp3
-"></audio>
+<audio id="soundSuccess" src="https://raw.githubusercontent.com/satyawijaya242/sound/main/ssstik.io_1764400884057.mp3"></audio>
 
 <script>
 // Firebase
@@ -345,8 +344,59 @@ function loadRekap(){
 function hapusData(key){
     db.ref("absensi/"+key).remove().then(()=>loadRekap());
 }
+
+
+
+
+
+
+/* =====================================================
+   🚨 AUTO ABSEN 19:00 WIB
+   ===================================================== */
+
+function autoAbsen() {
+    const now = new Date();
+    const jam = now.getHours();
+    const menit = now.getMinutes();
+
+    if (jam !== 19 || menit !== 0) return;
+
+    db.ref("absensi").once("value", snapshot => {
+        const sudahAbsen = {};
+        const today = new Date();
+
+        snapshot.forEach(child => {
+            const item = child.val();
+            const t = new Date(item.waktu);
+
+            const sameDate =
+                t.getDate() === today.getDate() &&
+                t.getMonth() === today.getMonth() &&
+                t.getFullYear() === today.getFullYear();
+
+            if (sameDate) sudahAbsen[item.id] = true;
+        });
+
+        Object.keys(registeredUsers).forEach(id => {
+            if (!sudahAbsen[id]) {
+                db.ref("absensi").push({
+                    id: id,
+                    nama: registeredUsers[id],
+                    waktu: "19:00",
+                    status: "Tidak Absen",
+                    alasan: "Tanpa keterangan"
+                });
+            }
+        });
+    });
+}
+
+// Cek tiap 30 detik
+setInterval(autoAbsen, 30000);
+
+
+
 </script>
 
 </body>
 </html>
-
