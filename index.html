@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Absensi Rutinan Paskibra</title>
+<style>
+body { font-family: Arial; background: #f4f6fa; margin:0; padding:0; }
+header{
+    background:#2d6cdf;
+    color:white;
+    padding:15px;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+}
+.container{
+    max-width:480px;
+    margin:30px auto;
+    background:white;
+    padding:25px;
+    border-radius:12px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+input, button, select{
+    width:100%;
+    padding:12px;
+    margin:8px 0;
+    border-radius:6px;
+    border:1px solid #ccc;
+    font-size:16px;
+}
+button{
+    background:#2d6cdf;
+    color:white;
+    cursor:pointer;
+    font-weight:bold;
+}
+button:hover{background:#1f54b8;}
+.link-btn{background:#555;}
+.back-btn{background:#777;margin-top:5px;}
+table{width:100%;border-collapse:collapse;margin-top:15px;}
+th, td{padding:8px;border-bottom:1px solid #ddd;text-align:left;}
+a{color:#2d6cdf;text-decoration:none;}
+a:hover{text-decoration:underline;}
+</style>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+</head>
+<body>
+
+<header>Absensi Rutinan</header>
+
+<!-- Halaman Absen -->
+<div class="container" id="absenPage">
+  <h3>Form Absensi</h3>
+  <p style="color:#555;font-size:14px;">
+    <b>Informasi:</b> Absensi hanya bisa dilakukan <b>hari Selasa & Sabtu</b>, pukul <b>12:00 WIB sampai 19:00 WIB</b>.
+  </p>
+  <label>Nomor ID</label>
+  <input type="text" id="userId" placeholder="Masukkan ID Anda...">
+
+  <label>Keterangan</label>
+  <select id="statusAbsen" onchange="toggleAlasanInput()">
+    <option value="Hadir">Hadir</option>
+    <option value="Izin">Izin</option>
+  </select>
+
+  <div id="alasanWrapper" style="display:none;">
+    <label>Alasan Izin</label>
+    <input type="text" id="alasanIzin" placeholder="Tuliskan alasan izin...">
+  </div>
+
+  <button onclick="submitAbsensi()">Apply Absen</button>
+  <button class="link-btn" onclick="openAdmin()">Login Admin</button>
+  <p style="color:red;font-weight:bold;" id="pesan"></p>
+</div>
+
+<!-- Halaman Login Admin -->
+<div class="container" id="adminLogin" style="display:none;">
+<h3>Login Admin</h3>
+<label>Password</label>
+<input type="password" id="adminPass" placeholder="Masukkan password admin">
+<button onclick="loginAdmin()">Login</button>
+<button class="back-btn" onclick="backToHome()">Kembali</button>
+<p id="adminLoginMsg" style="color:red;"></p>
+</div>
+
+<!-- Halaman Admin Panel -->
+<div class="container" id="adminPanel" style="display:none;">
+<h3>Rekap Absensi</h3>
+<table width="100%" id="rekapTable">
+<thead>
+<tr><th>ID</th><th>Nama</th><th>Waktu</th><th>Status</th><th>Alasan</th><th>Aksi</th></tr>
+</thead>
+<tbody id="rekapBody"></tbody>
+</table>
+<button class="back-btn" onclick="logoutAdmin()">Keluar Admin</button>
+</div>
+
+<script>
+// ======= CONFIG FIREBASE =======
+const firebaseConfig = {
+  apiKey: "AIzaSyCCheqFeLe-BS5ZZiyXLfmRVnyoDbmbMiM",
+  authDomain: "absen-74c40.firebaseapp.com",
+  databaseURL: "https://absen-74c40-default-rtdb.firebaseio.com",
+  projectId: "absen-74c40",
+  storageBucket: "absen-74c40.appspot.com",
+  messagingSenderId: "962064220204",
+  appId: "1:962064220204:web:8111b69ce31a5994f51189"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ======= DATA TERDAFTAR =======
+const registeredUsers = {
+    "200409":"Zendi Prianto",
+    "110810":"Ramadhan",
+    "111109":"M. Hafidz Atallah",
+    "070909":"Fardan Rakhmansyah",
+    "220209":"M. Ali Subechan",
+    "120108":"M. Khafidz Affandy",
+    "280508":"Nanda Alfares",
+    "210707":"Irwandy Yusuf",
+    "300310":"M. Sahrul Mubarok",
+    "270810":"Bening Putriyanah",
+    "210809":"Elisa Agustina",
+    "240310":"Assyifa Nur Khasanah",
+    "231109":"Vanesa Gresia Putri",
+    "060209":"Asti Dwi Febriani",
+    "051209":"Rahmatul Salimah",
+    "140210":"Izzah Wardatil Millah",
+    "110310":"Nur Laeli Rahma Tullah",
+    "110210":"Ainum Mahmudah",
+    "180210":"Dian Fakhrotun Nisa",
+    "140510":"Uyun Dwi Risquna",
+    "070110":"Ratih Rus Sukmah Watih",
+    "070310":"Fannes Aisha Putri",
+    "061108":"Naufal Rehan"
+};
+
+// ======= Toggle input alasan =======
+function toggleAlasanInput(){
+    const status = document.getElementById("statusAbsen").value;
+    document.getElementById("alasanWrapper").style.display = (status==="Izin") ? "block" : "none";
+}
+
+// ======= ABSENSI (1 ID 1x PER HARI + BATAS 19:00 WIB) =======
+function submitAbsensi(){
+    const id = document.getElementById("userId").value.trim();
+    const pesan = document.getElementById("pesan");
+    const status = document.getElementById("statusAbsen").value;
+
+    if(!id){pesan.style.color="red"; pesan.innerText="ID tidak boleh kosong!"; return;}
+    if(!registeredUsers[id]){pesan.style.color="red"; pesan.innerText="ID tidak terdaftar!"; return;}
+
+    const now = new Date();
+    const hari = now.getDay();
+    const jam = now.getHours();
+    const menit = now.getMinutes();
+
+    if(!(hari===2 || hari===6)){
+        pesan.style.color="red"; pesan.innerText="Absensi hanya bisa dilakukan hari Selasa & Sabtu!"; 
+        return;
+    }
+
+    if(jam < 12 || (jam === 19 && menit > 0) || jam > 19){
+        pesan.style.color="red"; 
+        pesan.innerText="Absensi hanya dapat dilakukan pukul 12:00 - 19:00 WIB!";
+        return;
+    }
+
+    // ===== CEK SUDAH ABSEN HARI INI =====
+    db.ref("absensi").once("value", snapshot => {
+        let sudah = false;
+
+        snapshot.forEach(snap => {
+            const item = snap.val();
+            const t = new Date(item.waktu);
+
+            const sameDate =
+                t.getDate() === now.getDate() &&
+                t.getMonth() === now.getMonth() &&
+                t.getFullYear() === now.getFullYear();
+
+            if (item.id === id && sameDate) {
+                sudah = true;
+            }
+        });
+
+        if (sudah) {
+            pesan.style.color = "red";
+            pesan.innerText = "Anda sudah absen hari ini!";
+            return;
+        }
+
+        // Lanjut simpan data
+        let statusFinal = status;
+
+        if(status === "Izin"){
+            const alasan = document.getElementById("alasanIzin").value.trim();
+            if(!alasan){
+                pesan.style.color="red";
+                pesan.innerText="Alasan izin wajib diisi!";
+                return;
+            }
+            simpanData(id, registeredUsers[id], now.toLocaleString(), statusFinal, alasan);
+        } else {
+            simpanData(id, registeredUsers[id], now.toLocaleString(), statusFinal, "-");
+        }
+    });
+}
+
+// ======= SIMPAN DATA =======
+function simpanData(id, nama, waktu, status, alasan){
+    const pesan = document.getElementById("pesan");
+
+    db.ref("absensi").push({
+        id:id,
+        nama:nama,
+        waktu:waktu,
+        status:status,
+        alasan:alasan || "-"
+    }, err => {
+        if(err){
+            pesan.style.color="red";
+            pesan.innerText="Gagal absen!";
+        } else {
+            pesan.style.color="green";
+            pesan.innerText="Absensi berhasil!";
+            document.getElementById("userId").value="";
+            document.getElementById("alasanIzin").value="";
+        }
+    });
+}
+
+// ======= ADMIN LOGIN =======
+function openAdmin(){document.getElementById("absenPage").style.display="none"; document.getElementById("adminLogin").style.display="block";}
+function backToHome(){document.getElementById("adminLogin").style.display="none"; document.getElementById("absenPage").style.display="block";}
+function loginAdmin(){
+    const pass = document.getElementById("adminPass").value;
+    if(pass==="fourl"){
+        document.getElementById("adminLogin").style.display="none";
+        document.getElementById("adminPanel").style.display="block"; 
+        loadRekap();
+    }
+    else document.getElementById("adminLoginMsg").innerText="Password salah!";
+}
+function logoutAdmin(){document.getElementById("adminPanel").style.display="none"; document.getElementById("absenPage").style.display="block";}
+
+// ======= REKAP =======
+function loadRekap(){
+    const body = document.getElementById("rekapBody");
+    body.innerHTML="";
+    db.ref('absensi').once('value', snapshot=>{
+        snapshot.forEach(snap=>{
+            const item = snap.val();
+            const key = snap.key;
+            body.innerHTML += `
+            <tr>
+                <td>${item.id}</td>
+                <td>${item.nama}</td>
+                <td>${item.waktu}</td>
+                <td>${item.status}</td>
+                <td>${item.alasan || "-"}</td>
+                <td><button onclick="hapusData('${key}')">Hapus</button></td>
+            </tr>`;
+        });
+    });
+}
+function hapusData(key){
+    db.ref('absensi/'+key).remove().then(()=>loadRekap());
+}
+</script>
+
+</body>
+</html>
