@@ -4,45 +4,115 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Absensi Rutinan Paskibra</title>
+
+<!-- ===== STYLE BARU (CLEAN & MODERN) ===== -->
 <style>
-body { font-family: Arial; background: #f4f6fa; margin:0; padding:0; }
+body { 
+    font-family: 'Segoe UI', Arial, sans-serif; 
+    background: #eef2f7; 
+    margin:0; 
+    padding:0; 
+}
+
+/* Header */
 header{
     background:#2d6cdf;
     color:white;
-    padding:15px;
+    padding:18px;
     text-align:center;
-    font-size:22px;
-    font-weight:bold;
+    font-size:24px;
+    font-weight:600;
+    letter-spacing:1px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.15);
 }
+
+/* Card Container */
 .container{
     max-width:480px;
-    margin:30px auto;
+    margin:35px auto;
     background:white;
-    padding:25px;
-    border-radius:12px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.1);
+    padding:28px;
+    border-radius:14px;
+    box-shadow:0 6px 18px rgba(0,0,0,0.12);
+    animation: fadeIn 0.4s ease;
 }
+
+/* Fade animation */
+@keyframes fadeIn{
+    from{opacity:0; transform:translateY(10px);}
+    to{opacity:1; transform:translateY(0);}
+}
+
+/* Inputs & Buttons */
 input, button, select{
     width:100%;
     padding:12px;
-    margin:8px 0;
-    border-radius:6px;
-    border:1px solid #ccc;
+    margin:10px 0;
+    border-radius:8px;
+    border:1.5px solid #cfd7e3;
     font-size:16px;
+    transition:0.2s;
 }
+
+input:focus, select:focus{
+    border-color:#2d6cdf;
+    outline:none;
+    box-shadow:0 0 6px rgba(45,108,223,0.35);
+}
+
 button{
     background:#2d6cdf;
     color:white;
     cursor:pointer;
     font-weight:bold;
+    border:none;
+    transition:0.2s;
 }
-button:hover{background:#1f54b8;}
-.link-btn{background:#555;}
-.back-btn{background:#777;margin-top:5px;}
-table{width:100%;border-collapse:collapse;margin-top:15px;}
-th, td{padding:8px;border-bottom:1px solid #ddd;text-align:left;}
-a{color:#2d6cdf;text-decoration:none;}
-a:hover{text-decoration:underline;}
+
+button:hover{background:#1d4fb7;}
+
+.link-btn{ background:#505b7a; }
+.link-btn:hover{ background:#3c4663; }
+
+.back-btn{ background:#777; }
+.back-btn:hover{ background:#5f5f5f; }
+
+/* Table */
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+    font-size:15px;
+}
+
+th{
+    background:#2d6cdf;
+    color:white;
+    padding:10px;
+    text-align:left;
+    font-weight:600;
+}
+
+td{
+    padding:10px;
+    border-bottom:1px solid #ddd;
+}
+
+tr:hover td{
+    background:#f1f4ff;
+}
+
+/* Delete button */
+td button{
+    padding:8px 12px;
+    border-radius:6px;
+    background:#cf2d2d;
+    color:white;
+    border:none;
+    cursor:pointer;
+    font-size:14px;
+}
+td button:hover{ background:#b32222; }
 </style>
 
 <!-- Firebase -->
@@ -75,6 +145,7 @@ a:hover{text-decoration:underline;}
 
   <button onclick="submitAbsensi()">Apply Absen</button>
   <button class="link-btn" onclick="openAdmin()">Login Admin</button>
+
   <p style="color:red;font-weight:bold;" id="pesan"></p>
 </div>
 
@@ -156,8 +227,16 @@ function submitAbsensi(){
     const pesan = document.getElementById("pesan");
     const status = document.getElementById("statusAbsen").value;
 
-    if(!id){pesan.style.color="red"; pesan.innerText="ID tidak boleh kosong!"; return;}
-    if(!registeredUsers[id]){pesan.style.color="red"; pesan.innerText="ID tidak terdaftar!"; return;}
+    if(!id){
+        pesan.style.color="red"; 
+        pesan.innerText="ID tidak boleh kosong!"; 
+        return;
+    }
+    if(!registeredUsers[id]){
+        pesan.style.color="red"; 
+        pesan.innerText="ID tidak terdaftar!"; 
+        return;
+    }
 
     const now = new Date();
     const hari = now.getDay();
@@ -165,7 +244,8 @@ function submitAbsensi(){
     const menit = now.getMinutes();
 
     if(!(hari===2 || hari===6)){
-        pesan.style.color="red"; pesan.innerText="Absensi hanya bisa dilakukan hari Selasa & Sabtu!"; 
+        pesan.style.color="red"; 
+        pesan.innerText="Absensi hanya bisa dilakukan hari Selasa & Sabtu!"; 
         return;
     }
 
@@ -200,8 +280,6 @@ function submitAbsensi(){
         }
 
         // Lanjut simpan data
-        let statusFinal = status;
-
         if(status === "Izin"){
             const alasan = document.getElementById("alasanIzin").value.trim();
             if(!alasan){
@@ -209,9 +287,9 @@ function submitAbsensi(){
                 pesan.innerText="Alasan izin wajib diisi!";
                 return;
             }
-            simpanData(id, registeredUsers[id], now.toLocaleString(), statusFinal, alasan);
+            simpanData(id, registeredUsers[id], now.toLocaleString(), status, alasan);
         } else {
-            simpanData(id, registeredUsers[id], now.toLocaleString(), statusFinal, "-");
+            simpanData(id, registeredUsers[id], now.toLocaleString(), status, "-");
         }
     });
 }
@@ -240,8 +318,14 @@ function simpanData(id, nama, waktu, status, alasan){
 }
 
 // ======= ADMIN LOGIN =======
-function openAdmin(){document.getElementById("absenPage").style.display="none"; document.getElementById("adminLogin").style.display="block";}
-function backToHome(){document.getElementById("adminLogin").style.display="none"; document.getElementById("absenPage").style.display="block";}
+function openAdmin(){
+    document.getElementById("absenPage").style.display="none"; 
+    document.getElementById("adminLogin").style.display="block";
+}
+function backToHome(){
+    document.getElementById("adminLogin").style.display="none"; 
+    document.getElementById("absenPage").style.display="block";
+}
 function loginAdmin(){
     const pass = document.getElementById("adminPass").value;
     if(pass==="fourl"){
@@ -251,7 +335,10 @@ function loginAdmin(){
     }
     else document.getElementById("adminLoginMsg").innerText="Password salah!";
 }
-function logoutAdmin(){document.getElementById("adminPanel").style.display="none"; document.getElementById("absenPage").style.display="block";}
+function logoutAdmin(){
+    document.getElementById("adminPanel").style.display="none"; 
+    document.getElementById("absenPage").style.display="block";
+}
 
 // ======= REKAP =======
 function loadRekap(){
@@ -280,4 +367,3 @@ function hapusData(key){
 
 </body>
 </html>
-
